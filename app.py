@@ -3,128 +3,157 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
-from prophet import Prophet
 
-st.set_page_config(page_title="AI台股投資平台 V5", layout="wide")
+try:
+    from prophet import Prophet
+    PROPHET=True
+except:
+    PROPHET=False
 
-st.title("AI台股投資平台 V5")
+st.set_page_config(page_title="AI台股投資平台 V7", layout="wide")
+st.title("AI台股投資平台 V7")
 
-st.sidebar.header("功能選單")
-menu = st.sidebar.radio(
-    "選擇功能",
-    [
-        "股票搜尋",
-        "股價走勢",
-        "AI股價預測",
-        "AI概念股",
-        "低價潛力股",
-        "投資教學"
-    ]
-)
+menu = st.sidebar.radio("功能選單",[
+"股票搜尋","技術分析","AI預測","公司新聞",
+"AI概念股","低價股掃描","模擬交易",
+"股利計算器","投資教學"
+])
+
+if "cash" not in st.session_state:
+    st.session_state.cash=100000
+    st.session_state.portfolio={}
 
 def get_stock(code):
-    ticker = yf.Ticker(code + ".TW")
-    hist = ticker.history(period="1y")
-    return ticker, hist
+    t=yf.Ticker(code+".TW")
+    hist=t.history(period="1y")
+    try:
+        info=t.info
+    except:
+        info={}
+    return t,hist,info
 
 # 股票搜尋
-if menu == "股票搜尋":
-    code = st.text_input("輸入股票代碼", "2330")
+if menu=="股票搜尋":
+    code=st.text_input("股票代碼","2330")
     if code:
-        ticker, hist = get_stock(code)
-
+        t,hist,info=get_stock(code)
         if not hist.empty:
-            price = hist["Close"].iloc[-1]
-            st.metric("最新股價", round(price,2))
+            price=hist["Close"].iloc[-1]
+            st.metric("最新股價",round(price,2))
+            st.write("公司:",info.get("longName"))
+            st.write("產業:",info.get("industry"))
+            st.write("EPS:",info.get("trailingEps"))
+            st.write("本益比:",info.get("trailingPE"))
+            st.write(info.get("longBusinessSummary",""))
 
-            hist["MA5"] = hist["Close"].rolling(5).mean()
-            hist["MA20"] = hist["Close"].rolling(20).mean()
-            hist["MA60"] = hist["Close"].rolling(60).mean()
-
-            st.line_chart(hist[["Close","MA5","MA20","MA60"]])
-
-# 股價K線
-elif menu == "股價走勢":
-    code = st.text_input("輸入股票代碼", "2330")
-    ticker, hist = get_stock(code)
-
+# 技術分析
+elif menu=="技術分析":
+    code=st.text_input("股票代碼","2330")
+    t,hist,info=get_stock(code)
     if not hist.empty:
-        fig = go.Figure(data=[go.Candlestick(
-            x=hist.index,
-            open=hist['Open'],
-            high=hist['High'],
-            low=hist['Low'],
-            close=hist['Close']
-        )])
-        fig.update_layout(title="K線圖", height=600)
-        st.plotly_chart(fig, use_container_width=True)
+        hist["MA5"]=hist["Close"].rolling(5).mean()
+        hist["MA20"]=hist["Close"].rolling(20).mean()
+        hist["MA60"]=hist["Close"].rolling(60).mean()
 
-# AI股價預測
-elif menu == "AI股價預測":
-    code = st.text_input("輸入股票代碼", "2330")
-    ticker, hist = get_stock(code)
+        st.subheader("均線")
+        st.line_chart(hist[["Close","MA5","MA20","MA60"]])
 
-    if not hist.empty:
-        df = hist.reset_index()[["Date","Close"]]
-        df.columns = ["ds","y"]
+        delta=hist["Close"].diff()
+        gain=(delta.where(delta>0,0)).rolling(14).mean()
+        loss=(-delta.where(delta<0,0)).rolling(14).mean()
+        rs=gain/loss
+        hist["RSI"]=100-(100/(1+rs))
 
-        model = Prophet()
+        st.subheader("RSI")
+        st.line_chart(hist["RSI"])
+
+# AI預測
+elif menu=="AI預測":
+    code=st.text_input("股票代碼","2330")
+    t,hist,info=get_stock(code)
+
+    if PROPHET and not hist.empty:
+        df=hist.reset_index()[["Date","Close"]]
+        df.columns=["ds","y"]
+        model=Prophet()
         model.fit(df)
-
-        future = model.make_future_dataframe(periods=30)
-        forecast = model.predict(future)
-
-        st.subheader("未來30天AI預測")
+        future=model.make_future_dataframe(periods=30)
+        forecast=model.predict(future)
         st.line_chart(forecast.set_index("ds")["yhat"])
+    else:
+        st.warning("AI預測無法使用")
+
+# 公司新聞
+elif menu=="公司新聞":
+    code=st.text_input("股票代碼","2330")
+    t=yf.Ticker(code+".TW")
+    try:
+        news=t.news
+        for n in news[:10]:
+            st.write(n["title"])
+            st.write(n.get("publisher",""))
+            st.write(n.get("link",""))
+            st.write("---")
+    except:
+        st.write("沒有新聞")
 
 # AI概念股
-elif menu == "AI概念股":
-
-    ai_stocks = {
-        "2330":"台積電",
-        "2454":"聯發科",
-        "3037":"欣興",
-        "3443":"創意",
-        "3661":"世芯",
-        "6669":"緯穎"
+elif menu=="AI概念股":
+    ai={
+    "2330":"台積電",
+    "2454":"聯發科",
+    "3443":"創意",
+    "3661":"世芯",
+    "6669":"緯穎"
     }
+    for c,n in ai.items():
+        st.write(c,n)
 
-    st.subheader("AI概念股清單")
-
-    for code,name in ai_stocks.items():
-        st.write(code, name)
-
-# 低價潛力股 (簡化版示範)
-elif menu == "低價潛力股":
-
-    watchlist = ["1101","1216","1301","1326","1402","2002","2105","2207","2303","2317"]
-
-    results = []
-
-    for code in watchlist:
-        ticker = yf.Ticker(code + ".TW")
-        hist = ticker.history(period="1d")
-
-        if not hist.empty:
-            price = hist["Close"].iloc[-1]
-
-            if price < 20:
-                results.append((code, price))
-
-    st.subheader("20元以下潛力股")
-
-    if results:
-        df = pd.DataFrame(results, columns=["股票","價格"])
-        st.dataframe(df)
+# 低價股掃描
+elif menu=="低價股掃描":
+    watch=["1101","1216","1301","2303","2317","2603","2882"]
+    res=[]
+    for c in watch:
+        t=yf.Ticker(c+".TW")
+        h=t.history(period="1d")
+        if not h.empty:
+            p=h["Close"].iloc[-1]
+            if p<20:
+                res.append((c,p))
+    if res:
+        st.dataframe(pd.DataFrame(res,columns=["股票","價格"]))
     else:
-        st.write("今天沒有符合條件股票")
+        st.write("沒有符合條件股票")
 
-# 投資教學
-elif menu == "投資教學":
+# 模擬交易
+elif menu=="模擬交易":
+    st.write("現金",st.session_state.cash)
+    code=st.text_input("股票","2330")
+    qty=st.number_input("股數",1)
+    if st.button("買入"):
+        t=yf.Ticker(code+".TW")
+        h=t.history(period="1d")
+        if not h.empty:
+            price=h["Close"].iloc[-1]
+            cost=price*qty
+            if st.session_state.cash>=cost:
+                st.session_state.cash-=cost
+                st.session_state.portfolio[code]=st.session_state.portfolio.get(code,0)+qty
+                st.success("買入成功")
+            else:
+                st.error("資金不足")
+    if st.button("查看持股"):
+        st.write(st.session_state.portfolio)
 
-    st.header("股票新手教學")
+# 股利計算
+elif menu=="股利計算器":
+    price=st.number_input("股價",100.0)
+    yield_rate=st.number_input("殖利率 %",5.0)
+    shares=st.number_input("股數",1000)
+    dividend=price*(yield_rate/100)*shares
+    st.write("預估股利",dividend)
 
-    st.write("EPS = 每股盈餘，公司每股賺多少錢")
-    st.write("PE = 本益比，股價 / EPS")
-    st.write("MA5 / MA20 / MA60 = 移動平均線")
-    st.write("K線 = 顯示股價每日變化")
+elif menu=="投資教學":
+    st.write("EPS=每股盈餘")
+    st.write("PE=本益比")
+    st.write("RSI=動能指標")
