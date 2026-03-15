@@ -1,23 +1,22 @@
 
 import streamlit as st
 
-st.set_page_config(page_title="AI股票分析系統 V20", layout="wide")
+st.set_page_config(page_title="AI投資平台 V80", layout="wide")
 
-st.title("📈 AI股票分析系統 V20")
+st.title("🤖 AI投資決策平台 V80")
 
-st.info("新手請先點左側【投資教學】")
+st.success("左側選單包含所有分析工具")
 
 st.markdown("""
-系統功能
+### 新手建議操作順序
 
-📊 即時行情
-📉 技術分析
-🤖 AI判定建議
-🤖 AI選股
-📊 ETF分析
-🏆 台股排行榜
-🚀 飆股雷達
-💰 模擬交易
-📰 股票新聞
-📘 投資教學
+1️⃣ 產業股票篩選  
+2️⃣ 股票行情  
+3️⃣ AI投資判定  
+4️⃣ ETF分析  
+5️⃣ 戰情儀表板  
+6️⃣ 模擬交易  
+
 """)
+
+st.info("系統整合：AI分析 + 產業篩選 + 投資模擬 + ETF分析 + 戰情監控")
