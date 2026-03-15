@@ -1,6 +1,10 @@
 
 streamlit
-yfinance
 pandas
 plotly
-prophet
+requests
+beautifulsoup4
+scikit-learn
+numpy
+yfinance
+twstock
